@@ -25,6 +25,8 @@ OUTPUT = "assets/ascii-name.svg"
 CYCLE = 8.5           # seconds per full loop
 INTRO = 2.4           # seconds of black-hole zoom before the name
 BLACKHOLE_IMG = "assets/blackhole.jpg"  # rendered by generate_blackhole.py
+GALAXY_IMG = "assets/galaxy.jpg"        # rendered by generate_galaxy.py, sits behind the name
+GALAXY_OPACITY = 0.65
 SCRAMBLE_FRAMES = 18  # frames in the decrypt phase
 FRAME_TIME = 0.085    # seconds per scramble frame
 SEED = 7
@@ -186,6 +188,17 @@ def main():
                f".term{{animation:term {CYCLE}s step-end infinite}}")
     sp_css, sp_defs, sp_svg = space_layer(width, height, rnd)
     css.extend(sp_css)
+    # spiral galaxy behind the name: fades in as we come out of the black hole, drifts slowly
+    import base64
+    with open(GALAXY_IMG, "rb") as fh:
+        gal_b64 = base64.b64encode(fh.read()).decode()
+    css.append(f"@keyframes galv{{0%,{pct(INTRO - 0.1)}{{opacity:0}}{pct(INTRO + 0.9)},{pct(t_out)}{{opacity:{GALAXY_OPACITY}}}100%{{opacity:0}}}}"
+               f".galv{{animation:galv {CYCLE}s linear infinite}}"
+               f"@keyframes galz{{0%,{pct(INTRO - 0.1)}{{transform:scale(1.12) rotate(-2deg)}}100%{{transform:scale(1) rotate(0deg)}}}}"
+               f".galz{{transform-origin:{width / 2:.1f}px {height / 2:.1f}px;animation:galz {CYCLE}s cubic-bezier(.2,.6,.3,1) infinite}}")
+    gal_svg = (f'<g clip-path="url(#win)"><g class="galv" opacity="0"><g class="galz">'
+               f'<image href="data:image/jpeg;base64,{gal_b64}" x="0" y="0" width="{width}" height="{height}" preserveAspectRatio="none"/>'
+               f'</g><rect width="{width}" height="{height}" fill="url(#vign)"/></g></g>')
 
     style = """
     .art{font:16px 'Fira Code','JetBrains Mono','Cascadia Code',Consolas,Menlo,'DejaVu Sans Mono',monospace;fill:url(#grad);white-space:pre}
@@ -205,11 +218,13 @@ def main():
   </filter>
   <clipPath id="cp"><rect class="typ" x="{PAD_X + 2 * CW:.1f}" y="28" height="22" width="0"/></clipPath>
   {sp_defs}
+  <radialGradient id="vign" cx=".5" cy=".5" r=".75"><stop offset=".6" stop-color="#0d1117" stop-opacity="0"/><stop offset="1" stop-color="#0d1117" stop-opacity=".7"/></radialGradient>
   <clipPath id="cs"><rect class="sub" x="{PAD_X:.1f}" y="{sub_y - 16}" height="24" width="0"/></clipPath>
 </defs>
 <style>{style}</style>
 <rect width="100%" height="100%" rx="12" fill="#0d1117"/>
 {sp_svg}
+{gal_svg}
 <rect x=".5" y=".5" width="{width - 1}" height="{height - 1}" rx="12" fill="none" stroke="#30363d"/>
 <circle cx="20" cy="16" r="5" fill="#ff5f56"/><circle cx="37" cy="16" r="5" fill="#ffbd2e"/><circle cx="54" cy="16" r="5" fill="#27c93f"/>
 <text class="ui" x="{width / 2:.0f}" y="20" fill="#6e7681" text-anchor="middle">sanzid@github: ~</text>
