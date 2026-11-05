@@ -4,7 +4,7 @@ Generate an animated ASCII-art name banner (SVG) for a GitHub profile README.
 
 GitHub README-te JavaScript chole na, kintu SVG-er bhitorer CSS animation chole.
 Tai ei script ekta self-contained animated SVG banai:
-  0. Space intro:   galaxy + black hole, camera zooms into the black hole
+  0. Space intro:   rendered black hole (generate_blackhole.py), slow zoom into it
   1. Terminal boot:  `$ ./whoami` type hoy
   2. Decrypt effect: random ASCII glyph theke dhire dhire tomar naam reveal hoy
   3. Glow + subtitle typing + blinking cursor
@@ -23,7 +23,8 @@ SUBTITLE = "Developer  ·  Problem Solver  ·  Lifelong Learner"
 PROMPT_CMD = "./whoami --banner"
 OUTPUT = "assets/ascii-name.svg"
 CYCLE = 8.5           # seconds per full loop
-INTRO = 2.4           # seconds of galaxy / black-hole zoom before the name
+INTRO = 2.4           # seconds of black-hole zoom before the name
+BLACKHOLE_IMG = "assets/blackhole.jpg"  # rendered by generate_blackhole.py
 SCRAMBLE_FRAMES = 18  # frames in the decrypt phase
 FRAME_TIME = 0.085    # seconds per scramble frame
 SEED = 7
@@ -73,70 +74,38 @@ def pct(t):
 
 
 def space_layer(width, height, rnd):
-    """Starfield + tilted spiral galaxy + black hole with accretion disk; zooms into the hole."""
-    cx, cy, R = width / 2, height / 2 + 8, 28
+    """Rendered black-hole image (see generate_blackhole.py) with a slow cinematic push-in,
+    then a fall into the dark before the terminal sequence starts."""
+    import base64
+    cx, cy = width / 2, height / 2 + 8
+    with open(BLACKHOLE_IMG, "rb") as fh:
+        b64 = base64.b64encode(fh.read()).decode()
     css = [
-        # camera: drift in, then accelerate into the event horizon
-        f"@keyframes bhz{{0%{{transform:scale(1);animation-timing-function:ease-out}}"
-        f"{pct(1.2)}{{transform:scale(1.3);animation-timing-function:cubic-bezier(.6,0,.95,.35)}}"
-        f"{pct(INTRO - 0.1)},100%{{transform:scale(36)}}}}"
+        # camera: slow, smooth push-in ... then accelerate gently into the shadow
+        f"@keyframes bhz{{0%{{transform:scale(1);animation-timing-function:cubic-bezier(.4,0,.6,1)}}"
+        f"{pct(1.5)}{{transform:scale(1.22);animation-timing-function:cubic-bezier(.65,0,1,.7)}}"
+        f"{pct(INTRO - 0.05)},100%{{transform:scale(5.5)}}}}"
         f".bhz{{transform-origin:{cx:.1f}px {cy:.1f}px;animation:bhz {CYCLE}s infinite}}",
-        f"@keyframes bhv{{0%{{opacity:0}}{pct(0.35)},{pct(INTRO - 0.15)}{{opacity:1}}{pct(INTRO + 0.1)},100%{{opacity:0}}}}"
+        # fade in from the terminal background, out at the hand-off
+        f"@keyframes bhv{{0%{{opacity:0}}{pct(0.5)},{pct(INTRO - 0.15)}{{opacity:1}}{pct(INTRO + 0.05)},100%{{opacity:0}}}}"
         f".bhv{{animation:bhv {CYCLE}s linear infinite}}",
-        f"@keyframes gal{{0%{{transform:rotate(0deg)}}{pct(INTRO)},100%{{transform:rotate(-45deg)}}}}"
-        f".gal{{transform-origin:0 0;animation:gal {CYCLE}s linear infinite}}",
-        "@keyframes tw{0%,100%{opacity:1}50%{opacity:.15}}"
-        ".tw0{animation:tw 1.7s infinite}.tw1{animation:tw 2.4s .5s infinite}.tw2{animation:tw 3.2s 1.1s infinite}",
-        "@keyframes spin{to{stroke-dashoffset:-200}}",
+        # darkness swallowing the view while we fall in
+        f"@keyframes bhd{{0%,{pct(1.6)}{{opacity:0}}{pct(INTRO - 0.1)},100%{{opacity:1}}}}"
+        f".bhd{{animation:bhd {CYCLE}s ease-in infinite}}",
+        # a few stars twinkle on top of the still image
+        "@keyframes tw{0%,100%{opacity:.9}50%{opacity:.15}}"
+        ".tw0{animation:tw 1.9s infinite}.tw1{animation:tw 2.7s .6s infinite}.tw2{animation:tw 3.4s 1.2s infinite}",
     ]
     stars = "".join(
         f'<circle class="tw{i % 3}" cx="{rnd.uniform(0, width):.1f}" cy="{rnd.uniform(0, height):.1f}" '
-        f'r="{rnd.choice([0.5, 0.7, 0.9, 1.2])}" fill="#fff"/>' for i in range(170))
-
-    palette = ["#ffffff", "#7ee7ff", "#00d9f5", "#00f5a0", "#a855f7", "#c084fc"]
-    dots = []
-    for i in range(820):
-        k, t = i % 2, rnd.random() ** 0.85
-        ang = k * math.pi + t * 3.4 * math.pi + rnd.gauss(0, 0.28)
-        rad = 50 + t * 440 + rnd.gauss(0, 12)
-        col = palette[max(0, min(len(palette) - 1, int(t * len(palette) + rnd.uniform(-1, 1))))]
-        dots.append(f'<circle cx="{rad * math.cos(ang):.1f}" cy="{rad * math.sin(ang):.1f}" '
-                    f'r="{rnd.uniform(0.5, 1.5) * (1.25 - 0.5 * t):.2f}" fill="{col}" '
-                    f'opacity="{(1 - 0.45 * t) * rnd.uniform(0.45, 1.0):.2f}"/>')
-    galaxy = (f'<g transform="translate({cx:.1f} {cy:.1f}) scale(1 0.34) rotate(-14)">'
-              f'<ellipse rx="330" ry="150" fill="url(#galglow)"/><g class="gal">{"".join(dots)}</g></g>')
-
-    dashes = ["34 2 2 2", "18 2 18 2", "36 4", "26 2 10 2", "30 3 4 3", "20 2 16 2", "36 2 1 1", "12 2 24 2", "28 4 6 2"]
-    rings = []
-    for j, rx in enumerate([40, 46, 53, 61, 70, 80, 92, 105, 120]):
-        dur = 0.8 + j * 0.35
-        css.append(f".s{j}{{animation:spin {dur:.2f}s linear infinite}}")
-        rings.append(f'<ellipse class="s{j}" cx="{cx:.1f}" cy="{cy:.1f}" rx="{rx}" ry="{rx * 0.2:.1f}" fill="none" '
-                     f'stroke="url(#disk)" stroke-width="{rx / 13:.1f}" stroke-dasharray="{dashes[j]}" '
-                     f'opacity="{1 - j * 0.09:.2f}"/>')
-    disk = "".join(rings)
-    hole = (f'<circle cx="{cx:.1f}" cy="{cy:.1f}" r="150" fill="url(#halo)"/>'
-            f'<g filter="url(#soft)">{disk}</g>'
-            f'<ellipse cx="{cx:.1f}" cy="{cy:.1f}" rx="{R + 13}" ry="{R + 11}" fill="none" stroke="url(#disk)" '
-            f'stroke-width="8" opacity=".6" filter="url(#wide)"/>'
-            f'<ellipse cx="{cx:.1f}" cy="{cy:.1f}" rx="{R + 6}" ry="{R + 5}" fill="none" stroke="#bff6ff" '
-            f'stroke-width="2.5" opacity=".7" filter="url(#soft)"/>'
-            f'<circle cx="{cx:.1f}" cy="{cy:.1f}" r="{R}" fill="#020305"/>'
-            f'<circle cx="{cx:.1f}" cy="{cy:.1f}" r="{R + 1.2}" fill="none" stroke="#effcff" stroke-width="1.2" opacity=".9"/>'
-            f'<g clip-path="url(#front)" filter="url(#soft)">{disk}</g>')
-    defs = (
-        f'<clipPath id="win"><rect width="{width}" height="{height}" rx="12"/></clipPath>\n'
-        f'  <clipPath id="front"><rect x="0" y="{cy:.1f}" width="{width}" height="{height}"/></clipPath>\n'
-        '  <radialGradient id="halo"><stop offset="0" stop-color="#bff6ff" stop-opacity=".55"/>'
-        '<stop offset=".35" stop-color="#00d9f5" stop-opacity=".18"/><stop offset="1" stop-color="#a855f7" stop-opacity="0"/></radialGradient>\n'
-        '  <radialGradient id="galglow"><stop offset="0" stop-color="#7ee7ff" stop-opacity=".3"/>'
-        '<stop offset=".5" stop-color="#a855f7" stop-opacity=".08"/><stop offset="1" stop-color="#a855f7" stop-opacity="0"/></radialGradient>\n'
-        '  <linearGradient id="disk" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#ffffff"/>'
-        '<stop offset=".3" stop-color="#7ee7ff"/><stop offset=".65" stop-color="#00f5a0"/><stop offset="1" stop-color="#a855f7"/></linearGradient>\n'
-        '  <filter id="soft" x="-20%" y="-50%" width="140%" height="200%"><feGaussianBlur stdDeviation="1.6" result="b"/>'
-        '<feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>\n'
-        '  <filter id="wide" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="4"/></filter>')
-    svg = f'<g clip-path="url(#win)"><g class="bhv"><g class="bhz">{stars}{galaxy}{hole}</g></g></g>'
+        f'r="{rnd.choice([0.5, 0.6, 0.8])}" fill="#e8f4ff"/>' for i in range(28))
+    defs = (f'<clipPath id="win"><rect width="{width}" height="{height}" rx="12"/></clipPath>\n'
+            f'  <radialGradient id="dark"><stop offset="0" stop-color="#0d1117"/>'
+            f'<stop offset=".55" stop-color="#0d1117"/><stop offset="1" stop-color="#0d1117" stop-opacity=".85"/></radialGradient>')
+    svg = (f'<g clip-path="url(#win)"><g class="bhv"><g class="bhz">'
+           f'<image href="data:image/jpeg;base64,{b64}" x="0" y="0" width="{width}" height="{height}" preserveAspectRatio="none"/>'
+           f'{stars}</g>'
+           f'<rect class="bhd" width="{width}" height="{height}" fill="url(#dark)" opacity="0"/></g></g>')
     return css, defs, svg
 
 
