@@ -27,6 +27,7 @@ INTRO = 2.4           # seconds of black-hole zoom before the name
 BLACKHOLE_IMG = "assets/blackhole.jpg"  # rendered by generate_blackhole.py
 GALAXY_IMG = "assets/galaxy.jpg"        # rendered by generate_galaxy.py, sits behind the name
 GALAXY_OPACITY = 0.65
+GALAXY_ZOOM = 1.45                       # how close the galaxy sits behind the name
 SCRAMBLE_FRAMES = 18  # frames in the decrypt phase
 FRAME_TIME = 0.085    # seconds per scramble frame
 SEED = 7
@@ -194,7 +195,7 @@ def main():
         gal_b64 = base64.b64encode(fh.read()).decode()
     css.append(f"@keyframes galv{{0%,{pct(INTRO - 0.1)}{{opacity:0}}{pct(INTRO + 0.9)},{pct(t_out)}{{opacity:{GALAXY_OPACITY}}}100%{{opacity:0}}}}"
                f".galv{{animation:galv {CYCLE}s linear infinite}}"
-               f"@keyframes galz{{0%,{pct(INTRO - 0.1)}{{transform:scale(1.12) rotate(-2deg)}}100%{{transform:scale(1) rotate(0deg)}}}}"
+               f"@keyframes galz{{0%,{pct(INTRO - 0.1)}{{transform:scale({GALAXY_ZOOM * 1.12:.2f}) rotate(-2deg)}}100%{{transform:scale({GALAXY_ZOOM}) rotate(0deg)}}}}"
                f".galz{{transform-origin:{width / 2:.1f}px {height / 2:.1f}px;animation:galz {CYCLE}s cubic-bezier(.2,.6,.3,1) infinite}}")
     gal_svg = (f'<g clip-path="url(#win)"><g class="galv" opacity="0"><g class="galz">'
                f'<image href="data:image/jpeg;base64,{gal_b64}" x="0" y="0" width="{width}" height="{height}" preserveAspectRatio="none"/>'
